@@ -1,6 +1,6 @@
 import queryString from "query-string";
 
-const BASE_URL = 'http://127.0.0.1:8000'
+const BASE_URL = 'https://danyal178-landscape-backend.hf.space'
 
 export const getDesignStyles = async () => {
   const response = await fetch(`${BASE_URL}/Get_Design_Styles`);
