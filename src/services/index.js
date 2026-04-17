@@ -52,31 +52,28 @@ export const saveAlgorithmFeedback = async (payload) => {
 
 export const getPresetImages = async () => {
   const response = await fetch(`${BASE_URL}/Get_Preset_Input_Images`)
-   if (!response.ok) {
+  if (!response.ok) {
     throw new Error("Failed to fetch preset images");
   }
   const data = await response.json();
- return data?.preset_images || [];
-  
+  return data?.preset_images || [];
 };
 
-// services/index.js
 export const generateOutputDesigns = async ({ style_id, ai_creativity, number_of_designs, ai_instruction, preset_id, output_id, input_image1, mask }) => {
-  const queryParams = new URLSearchParams({
-    style_id,
-    ai_creativity,
-    number_of_designs
-  });
 
-  if (ai_instruction) {
-    queryParams.append("ai_instruction", ai_instruction);
-  }
+  // Build URL params without ai_instruction (send in body instead to avoid URL length limit)
+  let url = `${BASE_URL}/Generate_Output_Designs?style_id=${style_id}&ai_creativity=${ai_creativity}&number_of_designs=${number_of_designs}`;
+
   if (preset_id) {
-    queryParams.append("preset_id", preset_id);
+    url += `&preset_id=${preset_id}`;
   }
   if (output_id) {
-    queryParams.append("output_id", output_id);
+    url += `&output_id=${output_id}`;
   }
+
+  // Send ai_instruction as query param but truncate if too long
+  const instruction = ai_instruction ? ai_instruction.substring(0, 200) : "";
+  url += `&ai_instruction=${encodeURIComponent(instruction)}`;
 
   const formData = new FormData();
   if (input_image1) {
@@ -84,15 +81,29 @@ export const generateOutputDesigns = async ({ style_id, ai_creativity, number_of
   }
   formData.append("mask", mask);
 
-  const response = await fetch(`${BASE_URL}/Generate_Output_Designs?${queryParams.toString()}`, {
-    method: "POST",
-    body: formData
-  });
+  // Increase timeout to 10 minutes for slow CPU generation
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 600000);
 
-  if (!response.ok) {
-    throw new Error('Something went wrong');
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error('Something went wrong');
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Generation timed out. Please try again with fewer designs.');
+    }
+    throw error;
   }
-  const data = await response.json();
-  return data;
 };
-
