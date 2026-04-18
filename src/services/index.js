@@ -61,7 +61,7 @@ export const getPresetImages = async () => {
 
 export const generateOutputDesigns = async ({ style_id, ai_creativity, number_of_designs, ai_instruction, preset_id, output_id, input_image1, mask }) => {
 
-  // Build URL params without ai_instruction (send in body instead to avoid URL length limit)
+  // Build URL without ai_instruction to avoid URL length issues
   let url = `${BASE_URL}/Generate_Output_Designs?style_id=${style_id}&ai_creativity=${ai_creativity}&number_of_designs=${number_of_designs}`;
 
   if (preset_id) {
@@ -71,7 +71,7 @@ export const generateOutputDesigns = async ({ style_id, ai_creativity, number_of
     url += `&output_id=${output_id}`;
   }
 
-  // Send ai_instruction as query param but truncate if too long
+  // Truncate ai_instruction to avoid URL length limit
   const instruction = ai_instruction ? ai_instruction.substring(0, 200) : "";
   url += `&ai_instruction=${encodeURIComponent(instruction)}`;
 
@@ -81,7 +81,7 @@ export const generateOutputDesigns = async ({ style_id, ai_creativity, number_of
   }
   formData.append("mask", mask);
 
-  // Increase timeout to 10 minutes for slow CPU generation
+  // 10 minute timeout for slow generation
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 600000);
 
