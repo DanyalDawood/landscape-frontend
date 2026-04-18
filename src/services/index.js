@@ -59,42 +59,62 @@ export const getPresetImages = async () => {
   return data?.preset_images || [];
 };
 
+// Helper to convert File/Blob to base64
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Remove data:image/png;base64, prefix
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = error => reject(error);
+  });
+};
+
 export const generateOutputDesigns = async ({ style_id, ai_creativity, number_of_designs, ai_instruction, preset_id, output_id, input_image1, mask }) => {
 
-  // Build URL without ai_instruction to avoid URL length issues
-  let url = `${BASE_URL}/Generate_Output_Designs?style_id=${style_id}&ai_creativity=${ai_creativity}&number_of_designs=${number_of_designs}`;
-
-  if (preset_id) {
-    url += `&preset_id=${preset_id}`;
-  }
-  if (output_id) {
-    url += `&output_id=${output_id}`;
-  }
-
-  // Truncate ai_instruction to avoid URL length limit
-  const instruction = ai_instruction ? ai_instruction.substring(0, 200) : "";
-  url += `&ai_instruction=${encodeURIComponent(instruction)}`;
-
-  const formData = new FormData();
+  // Convert images to base64
+  const mask_b64 = await fileToBase64(mask);
+  let input_image_b64 = "";
   if (input_image1) {
-    formData.append("input_image1", input_image1);
+    input_image_b64 = await fileToBase64(input_image1);
   }
-  formData.append("mask", mask);
 
-  // 10 minute timeout for slow generation
+  // Truncate instruction
+  const instruction = ai_instruction ? ai_instruction.substring(0, 200) : "";
+
+  // Send as JSON body
+  const body = {
+    style_id: parseInt(style_id),
+    ai_creativity: parseFloat(ai_creativity),
+    number_of_designs: parseInt(number_of_designs),
+    ai_instruction: instruction,
+    preset_id: preset_id ? parseInt(preset_id) : 0,
+    input_image_b64: input_image_b64,
+    mask_b64: mask_b64
+  };
+
+  // 10 minute timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 600000);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(`${BASE_URL}/Generate_Output_Designs`, {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Server error:', errorText);
       throw new Error('Something went wrong');
     }
     const data = await response.json();
